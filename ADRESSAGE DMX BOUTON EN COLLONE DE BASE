@@ -1,0 +1,184 @@
+/*
+ * Prototype Screen et Touch 
+ */
+// Commentaire
+
+#include <EEPROM.h>// lib pour enregistré l'adresse dmx
+#include <DMXSerial.h>//lib pour le code dmx
+#include <UTFT.h>//lib d'affichage 
+#include <URTouch.h>//lib du tactile
+#define RECORD_CANAL_ADDRESS 1
+#define COLUMN 3
+#define LINE 4
+
+//ITDB32WC
+
+UTFT    myGLCD(ITDB32WC,38,39,40,41);//pin utiliser pour l'affichage
+URTouch  myTouch( 6, 5, 4, 3, 2);// pin utiliser pour le tactille
+
+
+extern uint8_t BigFont[];
+extern uint8_t SevenSegNumFont[];
+// Axe de L'Ecran 
+int x, y;
+int column_current = 0;
+int line_current = 0;
+
+int current_canal = 0;
+int current_canal_2 = 0; 
+int current_canal_3 = 0; 
+
+/* 
+ * Affiche le valeur du canal 
+ */
+void drawDisplay(char value)
+{
+    myGLCD.setColor(175, 175, 255);//couleur arriere du text
+    myGLCD.fillRoundRect (10,62,60,120);
+    myGLCD.setColor(0, 0, 255);//couleur du text
+    myGLCD.drawRoundRect (10,62,60,120);
+    myGLCD.printNumI((char)current_canal, 20,66);
+    myGLCD.setFont(SevenSegNumFont);
+
+}
+
+/*
+ * Affiche les boutons
+ */
+void drawButtons()
+{
+
+  // le bouton - centaine
+    myGLCD.setColor(0, 0, 255);//couleur du bouton
+    myGLCD.fillRoundRect (10,10,60,60);
+    myGLCD.setColor(175,175,255);//couleur du text
+    myGLCD.drawRoundRect (10,10,60,60);
+    myGLCD.setFont(BigFont);
+    myGLCD.setBackColor(0, 0, 255);//couleur  du texte bouton
+    myGLCD.print("+", 28,28);
+   // le bouton - dizainne
+    myGLCD.setColor(0, 0, 255);//couleur du bouton
+    myGLCD.fillRoundRect (10,122,60,172);
+    myGLCD.setColor(175,175,255);//couleur du text
+    myGLCD.drawRoundRect (10,122,60,172);
+    myGLCD.print("-", 28, 140);
+    // le bouton - unité
+    myGLCD.setColor(0,0,255);//couleur du bouton
+    myGLCD.fillRoundRect (10,179,60,229);
+    myGLCD.setColor(175,175,255);//couleur du text
+    myGLCD.drawRoundRect (10,179,60,229);
+    myGLCD.print("R", 28, 200);
+  
+    myGLCD.setBackColor (175, 175, 255); //fond du texte en dessou des bouton
+    myGLCD.setFont (SevenSegNumFont);
+}
+
+
+  
+/*
+ * Effet autour des boutons
+ */
+void waitForIt(int x1, int y1, int x2, int y2)
+{
+  myGLCD.setColor(67, 149, 51);//couleur contour des touche a lapui
+  myGLCD.drawRoundRect (x1, y1, x2, y2);//dessine unrectangle au bord arondis
+  while (myTouch.dataAvailable())
+  myTouch.read();
+  myGLCD.setColor( 0, 0, 0);//couleur contour des touche 
+  myGLCD.drawRoundRect (x1, y1, x2, y2);
+}
+
+
+/*
+ * Initialisation du programme à faire avant le LOOP (répétition du programme)
+ * - Lancement de l'écran
+ * - Affichage par defaut 
+ */
+void setup() {
+   myGLCD.InitLCD(1);//initialize l'ecran lcd en paysage
+   myGLCD.clrScr();
+   myTouch.InitTouch(1);//initialize l'écran de touche en paysage
+   myTouch.setPrecision(PREC_MEDIUM);//slection de la pressision de touch
+   myGLCD.fillScr(0,0,25);
+   current_canal = readCanalToEprom();
+   drawButtons();
+   drawDisplay('0');
+}
+
+/*
+ *  Enregiste en mémoire un entier
+ */
+void recordCanalToEprom(int canal)
+{
+    EEPROM.write(RECORD_CANAL_ADDRESS, canal);
+}
+
+
+/*
+ * Lit en mémoire un entier
+ */
+int readCanalToEprom()
+{
+    return EEPROM.read(RECORD_CANAL_ADDRESS);  
+}
+
+/*
+ * Incremente un entier et gère le retour à 0 au dessus de 9
+ * Décrémente un entier et gère le retour à 9 en dessous de 0
+ */
+int changecanal(int canal, char inc){
+  if(inc == '+') 
+  {
+     if(canal == 9) {return 0;}
+     else return canal + 1;   
+  }
+  if(inc == '-')
+  {
+    if (canal == 0){return 9;}
+    else return canal - 1;
+  }
+}
+
+
+void loop()
+{
+  
+    while (true)
+    {
+       if (myTouch.dataAvailable())
+       {
+          myTouch.read();
+          x=myTouch.getX();
+          y=myTouch.getY();
+          
+          if ((x>=10) && (x<=60)) // Ligne 1 
+          {
+              if ((y>=10) && (y<=60))  // Button: 1
+              {
+                waitForIt(10,60,10,60);
+                current_canal = changecanal(current_canal,'+');
+                drawDisplay((char)current_canal);
+                //recordCanalToEprom(current_canal);
+              }
+            
+              if ((y>=122) && (y<=172))  // Button: 2
+              {
+                  waitForIt(10,122,60,172);
+                  current_canal = changecanal(current_canal,'-');
+                  drawDisplay((char)current_canal);
+                  //recordCanalToEprom(current_canal);
+              }
+              
+              if ((y>=179) && (y<=229))  // Button: 3
+              {
+                  waitForIt(10,179,60,229);
+                  current_canal = 0;
+                  drawDisplay((char)current_canal);
+                  //recordCanalToEprom(current_canal);
+              }
+           }
+            
+         }
+    }
+}
+
